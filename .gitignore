@@ -52,6 +52,7 @@ test-results/
 
 .vercel/
 .netlify/
+backend/public/robots.txt
 
 .DS_Store
 Thumbs.db
