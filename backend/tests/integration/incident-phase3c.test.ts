@@ -584,9 +584,30 @@ function installStatefulMongoMocks(state: HarnessState): void {
   }) as never);
 
   vi.spyOn(VoteModel, 'aggregate').mockImplementation((async (
-    pipeline: Array<{ $match?: { incidentId?: Types.ObjectId } }>,
+    pipeline: Array<{
+      $match?: { incidentId?: Types.ObjectId | { $in?: Types.ObjectId[] } };
+    }>,
   ) => {
-    const incidentId = pipeline[0]?.$match?.incidentId?.toString();
+    const match = pipeline[0]?.$match?.incidentId;
+    const isBatch = typeof match === 'object' && match !== null && '$in' in match;
+    if (isBatch) {
+      const ids = new Set((match.$in ?? []).map((id) => id.toString()));
+      const grouped = new Map<string, { incidentId: Types.ObjectId; type: VoteType; count: number }>();
+      for (const vote of state.votes) {
+        const incidentId = vote.incidentId.toString();
+        if (!ids.has(incidentId)) continue;
+        const key = `${incidentId}:${vote.type}`;
+        const entry = grouped.get(key);
+        if (entry) entry.count += 1;
+        else grouped.set(key, { incidentId: vote.incidentId, type: vote.type, count: 1 });
+      }
+      return Array.from(grouped.values()).map((entry) => ({
+        _id: { incidentId: entry.incidentId, type: entry.type },
+        count: entry.count,
+      }));
+    }
+
+    const incidentId = match?.toString();
     let support = 0;
     let dispute = 0;
     for (const v of state.votes) {
@@ -599,6 +620,26 @@ function installStatefulMongoMocks(state: HarnessState): void {
     if (support > 0) rows.push({ _id: 'support', count: support });
     if (dispute > 0) rows.push({ _id: 'dispute', count: dispute });
     return rows;
+  }) as never);
+
+  vi.spyOn(ReportModel, 'aggregate').mockImplementation((async (
+    pipeline: Array<{
+      $match?: { targetType?: string; targetId?: { $in?: Types.ObjectId[] } };
+    }>,
+  ) => {
+    const ids = new Set(
+      (pipeline[0]?.$match?.targetId?.$in ?? []).map((id) => id.toString()),
+    );
+    const grouped = new Map<string, { _id: Types.ObjectId; count: number }>();
+    for (const report of state.reports) {
+      if (report.targetType !== 'incident') continue;
+      const targetId = report.targetId.toString();
+      if (!ids.has(targetId)) continue;
+      const entry = grouped.get(targetId);
+      if (entry) entry.count += 1;
+      else grouped.set(targetId, { _id: report.targetId, count: 1 });
+    }
+    return Array.from(grouped.values());
   }) as never);
 
   vi.spyOn(VoteModel, 'findOne').mockImplementation((() => ({
@@ -1280,6 +1321,12 @@ describe('Phase 3C HTTP integration: tracking, privacy, quick edit, feed paginat
       expect(page1.json.truncated).toBe(false);
       const items1 = page1.json.items as Array<{ trackingId: string }>;
       expect(items1).toHaveLength(PAGING.DEFAULT);
+      expect(items1[0]).toMatchObject({
+        description: expect.any(String),
+        location: { lat: expect.any(Number), lng: expect.any(Number) },
+        counts: { support: 0, dispute: 0, flags: 0, comments: 0 },
+        my: { vote: null, flagged: false },
+      });
       expect(page1.json.nextCursor).toBeTypeOf('string');
       expect(JSON.stringify(page1.json)).not.toContain('MD-H1DDEN99');
       expect(JSON.stringify(page1.json)).not.toContain('MD-DELET099');

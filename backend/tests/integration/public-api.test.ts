@@ -320,9 +320,20 @@ describe('Public API v1 integration tests (T02-T08)', () => {
       { _id: incidentId, count: 2 },
     ] as never);
     vi.spyOn(CommentModel, 'countDocuments').mockResolvedValue(2);
-    vi.spyOn(VoteModel, 'aggregate').mockResolvedValue([
-      { _id: 'support', count: 5 },
-      { _id: 'dispute', count: 1 },
+    vi.spyOn(VoteModel, 'aggregate').mockImplementation((async (pipeline: unknown[]) => {
+      const serialized = JSON.stringify(pipeline);
+      return serialized.includes('incidentId\",\"type')
+        ? [
+            { _id: { incidentId, type: 'support' }, count: 5 },
+            { _id: { incidentId, type: 'dispute' }, count: 1 },
+          ]
+        : [
+            { _id: 'support', count: 5 },
+            { _id: 'dispute', count: 1 },
+          ];
+    }) as never);
+    vi.spyOn(ReportModel, 'aggregate').mockResolvedValue([
+      { _id: incidentId, count: 1 },
     ] as never);
     vi.spyOn(ReportModel, 'countDocuments').mockResolvedValue(1);
     vi.spyOn(VoteModel, 'findOne').mockReturnValue(chain({ type: 'support' }) as never);
@@ -339,7 +350,17 @@ describe('Public API v1 integration tests (T02-T08)', () => {
       };
       expect(listBody.items).toHaveLength(1);
       expect(listBody.items[0]!.trackingId).toBe('MD-7K3Q9XTB');
-      expect(listBody.items[0]!.commentCount).toBe(2);
+      expect(listBody.items[0]!.counts).toEqual({
+        support: 5,
+        dispute: 1,
+        flags: 1,
+        comments: 2,
+      });
+      expect(listBody.items[0]).toMatchObject({
+        description: sampleDoc.description,
+        location: { lat: 23.869, lng: 90.4001 },
+        my: { vote: null, flagged: false },
+      });
       expect(listBody.truncated).toBe(false);
 
       const nearRes = await fetch(
