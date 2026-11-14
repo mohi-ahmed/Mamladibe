@@ -29,7 +29,7 @@ interface ApiIncident {
   title: string;
   description: string;
   excerpt?: string;
-  category: CategoryId;
+  category: unknown;
   incidentAt: string;
   createdAt: string;
   location: { lat: number; lng: number };
@@ -45,6 +45,25 @@ interface ApiIncident {
   counts: ApiCounts;
   my: { vote: "support" | "dispute" | null; flagged: boolean };
   distanceKm?: number;
+}
+
+const API_CATEGORY_MAP: Readonly<Record<string, CategoryId>> = {
+  road_accident: "road_accident",
+  accident: "road_accident",
+  traffic_violation: "traffic_violation",
+  violation: "traffic_violation",
+  police_misconduct: "police_misconduct",
+  police: "police_misconduct",
+  infrastructure: "infrastructure",
+  road: "infrastructure",
+  public_safety: "public_safety",
+  safety: "public_safety",
+  other: "other",
+};
+
+function categoryFromApi(value: unknown): CategoryId {
+  if (typeof value !== "string") return "other";
+  return API_CATEGORY_MAP[value.trim().toLowerCase()] ?? "other";
 }
 
 interface ApiComment {
@@ -63,7 +82,7 @@ function incidentFromApi(value: ApiIncident): Incident {
     trackingId: value.trackingId,
     title: value.title,
     description: value.description,
-    category: value.category,
+    category: categoryFromApi(value.category),
     lat: value.location.lat,
     lng: value.location.lng,
     roadName: value.roadName ?? "",
