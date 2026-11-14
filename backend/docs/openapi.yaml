@@ -1,0 +1,644 @@
+openapi: 3.1.0
+info:
+  title: Mamladibe API
+  version: 1.1.0
+  description: Canonical browser API for the public and admin applications.
+servers:
+  - url: /api/v1
+tags:
+  - name: Public
+  - name: Admin auth
+  - name: Admin
+paths:
+  /health:
+    get:
+      tags: [Public]
+      responses:
+        '200': { description: Service is healthy }
+        '503': { $ref: '#/components/responses/Error' }
+  /meta:
+    get:
+      tags: [Public]
+      responses:
+        '200':
+          description: Public enums, limits and server time
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /me/quota:
+    get:
+      tags: [Public]
+      responses:
+        '200':
+          description: Comment quota for the anonymous actor
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [commentsLeft, limit, resetsAt]
+                properties:
+                  commentsLeft: { type: integer, minimum: 0 }
+                  limit: { type: integer, minimum: 1 }
+                  resetsAt: { type: string, format: date-time }
+  /geo/reverse:
+    get:
+      tags: [Public]
+      parameters:
+        - { name: lat, in: query, required: true, schema: { type: number } }
+        - { name: lng, in: query, required: true, schema: { type: number } }
+      responses:
+        '200':
+          description: Flat reverse-geocoding result or manual fallback
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roadName: { type: string }
+                  areaName: { type: string }
+                  district: { type: string }
+                  fallback: { type: boolean }
+  /geo/search:
+    get:
+      tags: [Public]
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 2 } }
+      responses:
+        '200': { description: Bangladesh place candidates }
+  /incidents:
+    get:
+      tags: [Public]
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: district, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { enum: [newest, oldest, nearest] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500 } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: bbox, in: query, description: 'west,south,east,north', schema: { type: string } }
+        - { name: near, in: query, description: 'lat,lng', schema: { type: string } }
+        - { name: radiusKm, in: query, schema: { type: number, exclusiveMinimum: 0, maximum: 50 } }
+      responses:
+        '200':
+          description: Cursor-paginated incident feed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentList' }
+        '400': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateIncident' }
+      responses:
+        '201':
+          description: Incident and one-time reporter credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [incident, credentials]
+                properties:
+                  incident: { $ref: '#/components/schemas/PublicIncident' }
+                  credentials:
+                    type: object
+                    required: [trackingId, secret]
+                    properties:
+                      trackingId: { type: string }
+                      secret: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+  /incidents/{trackingId}:
+    parameters:
+      - { $ref: '#/components/parameters/TrackingId' }
+    get:
+      tags: [Public]
+      responses:
+        '200':
+          description: Public incident returned directly
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicIncident' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [secret]
+              properties:
+                secret: { type: string }
+                title: { type: string }
+                description: { type: string }
+                safetyTip: { type: [string, 'null'] }
+      responses:
+        '200':
+          description: Updated tracking response
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackResponse' }
+  /incidents/{trackingId}/vote:
+    parameters:
+      - { $ref: '#/components/parameters/TrackingId' }
+    post:
+      tags: [Public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { $ref: '#/components/schemas/VoteType' }
+      responses:
+        '200': { description: Updated counts and viewer vote }
+    delete:
+      tags: [Public]
+      responses:
+        '200': { description: Updated counts and null viewer vote }
+  /incidents/{trackingId}/reports:
+    parameters:
+      - { $ref: '#/components/parameters/TrackingId' }
+    post:
+      tags: [Public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateReport' }
+      responses:
+        '201': { description: Incident reported }
+  /incidents/{trackingId}/comments:
+    parameters:
+      - { $ref: '#/components/parameters/TrackingId' }
+    get:
+      tags: [Public]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Cursor-paginated comments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PublicComment' } }
+                  nextCursor: { type: [string, 'null'] }
+    post:
+      tags: [Public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, body]
+              properties:
+                type: { $ref: '#/components/schemas/CommentType' }
+                body: { type: string, minLength: 5, maxLength: 500 }
+                captchaToken: { type: string }
+      responses:
+        '201': { description: Created comment and remaining quota }
+  /comments/{id}:
+    delete:
+      tags: [Public]
+      parameters:
+        - { $ref: '#/components/parameters/ObjectId' }
+      responses:
+        '200': { description: Own comment deleted }
+  /comments/{id}/reports:
+    post:
+      tags: [Public]
+      parameters:
+        - { $ref: '#/components/parameters/ObjectId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateReport' }
+      responses:
+        '201': { description: Comment reported }
+  /track:
+    post:
+      tags: [Public]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trackingId, secret]
+              properties:
+                trackingId: { type: string }
+                secret: { type: string }
+      responses:
+        '200':
+          description: Private reporter tracking response
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrackResponse' }
+  /admin/auth/login:
+    post:
+      tags: [Admin auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200': { description: Pending 2FA session created }
+  /admin/auth/verify-2fa:
+    post:
+      tags: [Admin auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, pattern: '^\d{6}$' }
+      responses:
+        '200': { description: Active session, admin identity and CSRF token }
+  /admin/auth/me:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses:
+        '200': { description: Active admin and CSRF token }
+  /admin/auth/logout:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses:
+        '200': { description: Session revoked }
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses:
+        '200': { description: Moderation dashboard summary }
+  /admin/incidents:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Cursor-paginated admin incidents } }
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '201': { description: Team incident created } }
+  /admin/comments:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Cursor-paginated admin comments } }
+  /admin/reports:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Cursor-paginated report queue } }
+  /admin/actors:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Cursor-paginated actor list } }
+  /admin/audit:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Cursor-paginated audit log } }
+  /admin/users:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Super-admin user list } }
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '201': { description: Admin user created } }
+  /admin/settings:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Super-admin platform settings } }
+    patch:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '200': { description: Platform settings updated } }
+  /admin/incidents/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Incident moderation detail } }
+    patch:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '200': { description: Incident moderation edit applied } }
+    delete:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '200': { description: Incident soft-deleted } }
+  /admin/incidents/{id}/hide:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: Incident hidden } }
+  /admin/incidents/{id}/unhide:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: Incident unhidden } }
+  /admin/incidents/{id}/restore:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: Soft-deleted incident restored } }
+  /admin/incidents/{id}/permanent:
+    delete:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: Incident permanently purged (super only) } }
+  /admin/comments/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/ObjectId' }
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      responses: { '200': { description: Comment moderation detail } }
+    patch:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '200': { description: Comment redacted } }
+    delete:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '200': { description: Comment soft-deleted } }
+  /admin/comments/{id}/hide:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ObjectId' }
+      responses: { '200': { description: Comment hidden } }
+  /admin/comments/{id}/unhide:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ObjectId' }
+      responses: { '200': { description: Comment unhidden } }
+  /admin/comments/{id}/permanent:
+    delete:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ObjectId' }
+      responses: { '200': { description: Comment permanently purged (super only) } }
+  /admin/reports/{id}:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ObjectId' }
+      responses: { '200': { description: Report queue detail } }
+  /admin/reports/{id}/resolve:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ObjectId' }
+      responses: { '200': { description: Report resolved or dismissed } }
+  /admin/actors/{id}:
+    get:
+      tags: [Admin]
+      security: [{ adminCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: Actor profile } }
+  /admin/actors/{id}/notes:
+    patch:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: Actor notes updated } }
+  /admin/actors/{id}/restrict:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: Actor restricted } }
+  /admin/actors/{id}/unrestrict:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: Actor restriction removed } }
+  /admin/users/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/ObjectId' }
+    patch:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '200': { description: Admin user updated (super only) } }
+    delete:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      responses: { '200': { description: Admin user deleted (super only) } }
+  /admin/users/{id}/reset-2fa:
+    post:
+      tags: [Admin]
+      security: [{ adminCookie: [], csrfToken: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ObjectId' }
+      responses: { '200': { description: Admin user 2FA reset (super only) } }
+components:
+  securitySchemes:
+    adminCookie:
+      type: apiKey
+      in: cookie
+      name: mdb_admin
+    csrfToken:
+      type: apiKey
+      in: header
+      name: x-csrf-token
+  parameters:
+    TrackingId:
+      name: trackingId
+      in: path
+      required: true
+      schema: { type: string }
+    ObjectId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[0-9a-fA-F]{24}$' }
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  schemas:
+    Category:
+      type: string
+      enum: [road_accident, traffic_violation, police_misconduct, infrastructure, public_safety, other]
+    CommentType:
+      type: string
+      enum: [info, correction, experience]
+    VoteType:
+      type: string
+      enum: [support, dispute]
+    Location:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+    Counts:
+      type: object
+      required: [support, dispute, flags, comments]
+      properties:
+        support: { type: integer, minimum: 0 }
+        dispute: { type: integer, minimum: 0 }
+        flags: { type: integer, minimum: 0 }
+        comments: { type: integer, minimum: 0 }
+    PublicIncident:
+      type: object
+      required: [trackingId, title, description, category, incidentAt, createdAt, location, roadName, areaName, upazila, district, safetyTip, isEdited, editedAt, moderatedEdit, source, counts, my]
+      properties:
+        trackingId: { type: string }
+        title: { type: string }
+        description: { type: string }
+        excerpt: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        incidentAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        location: { $ref: '#/components/schemas/Location' }
+        roadName: { type: [string, 'null'] }
+        areaName: { type: [string, 'null'] }
+        upazila: { type: [string, 'null'] }
+        district: { type: [string, 'null'] }
+        safetyTip: { type: [string, 'null'] }
+        isEdited: { type: boolean }
+        editedAt: { type: [string, 'null'], format: date-time }
+        moderatedEdit: { type: boolean }
+        source: { enum: [public, team] }
+        counts: { $ref: '#/components/schemas/Counts' }
+        my:
+          type: object
+          required: [vote, flagged]
+          properties:
+            vote:
+              oneOf:
+                - { $ref: '#/components/schemas/VoteType' }
+                - { type: 'null' }
+            flagged: { type: boolean }
+        distanceKm: { type: number, minimum: 0 }
+    IncidentList:
+      type: object
+      required: [items, nextCursor, truncated]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PublicIncident' } }
+        nextCursor: { type: [string, 'null'] }
+        truncated: { type: boolean }
+    CreateIncident:
+      type: object
+      additionalProperties: false
+      required: [title, description, category, incidentAt, location]
+      properties:
+        title: { type: string, minLength: 5, maxLength: 100 }
+        description: { type: string, minLength: 20, maxLength: 2000 }
+        category: { $ref: '#/components/schemas/Category' }
+        incidentAt: { type: string, format: date-time }
+        location: { $ref: '#/components/schemas/Location' }
+        roadName: { type: string, maxLength: 120 }
+        areaName: { type: string, maxLength: 120 }
+        upazila: { type: string, maxLength: 120 }
+        district: { type: string, maxLength: 120 }
+        safetyTip: { type: string, maxLength: 500 }
+        captchaToken: { type: string }
+    PublicComment:
+      type: object
+      required: [id, type, body, placeholder, redacted, createdAt, mine]
+      properties:
+        id: { type: string }
+        type: { $ref: '#/components/schemas/CommentType' }
+        body: { type: [string, 'null'] }
+        placeholder: { type: boolean }
+        redacted: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        mine: { type: boolean }
+    CreateReport:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { enum: [spam, fake, misleading, inappropriate, irrelevant] }
+        note: { type: string, maxLength: 200 }
+    TrackResponse:
+      type: object
+      required: [incident, status, versions, edit]
+      properties:
+        incident: { $ref: '#/components/schemas/PublicIncident' }
+        status: { enum: [published, hidden, deleted] }
+        outcome: { type: [string, 'null'] }
+        versions:
+          type: array
+          items:
+            type: object
+            required: [version, title, description, editedAt, editedBy]
+            properties:
+              version: { type: integer }
+              title: { type: string }
+              description: { type: string }
+              safetyTip: { type: [string, 'null'] }
+              editedAt: { type: string, format: date-time }
+              editedBy: { enum: [reporter, moderator] }
+        edit:
+          type: object
+          required: [allowed, remainingSeconds, editsLeft]
+          properties:
+            allowed: { type: boolean }
+            remainingSeconds: { type: integer, minimum: 0 }
+            editsLeft: { type: integer, minimum: 0 }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+            requestId: { type: string }

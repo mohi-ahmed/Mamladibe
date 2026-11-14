@@ -1,0 +1,488 @@
+/*
+ * Tailwind v4 entry. Keep every @import in this top block.
+ */
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+@import "leaflet/dist/leaflet.css";
+@import "leaflet.markercluster/dist/MarkerCluster.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * MAMLADIBE design system — "Night Road"
+ * Asphalt surfaces, road-marking yellow, reflective white paint,
+ * highway-sign green, and one signal colour per incident category.
+ */
+
+@theme inline {
+  --font-sans: "Overpass", "Anek Bangla", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Anek Bangla", "Overpass", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Overpass Mono", ui-monospace, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Road palette */
+  --color-asphalt: var(--asphalt);
+  --color-asphalt-deep: var(--asphalt-deep);
+  --color-paint: var(--paint);
+  --color-sign: var(--sign);
+  --color-sign-foreground: var(--sign-foreground);
+  --color-signal-red: var(--signal-red);
+  --color-signal-amber: var(--signal-amber);
+  --color-signal-green: var(--signal-green);
+  --color-support: var(--support);
+  --color-dispute: var(--dispute);
+  --color-flag: var(--flag);
+
+  /* Category signal colours */
+  --color-cat-accident: var(--cat-accident);
+  --color-cat-violation: var(--cat-violation);
+  --color-cat-police: var(--cat-police);
+  --color-cat-road: var(--cat-road);
+  --color-cat-safety: var(--cat-safety);
+  --color-cat-other: var(--cat-other);
+
+  --animate-lane: lane 0.9s linear infinite;
+  --animate-ticker: ticker 40s linear infinite;
+  --animate-lane-x: lane-x 1.2s linear infinite;
+  --animate-signal: signal 6s linear infinite;
+  --animate-bob: bob 4s ease-in-out infinite;
+  --animate-blink: blink 1.6s ease-in-out infinite;
+  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-ping-slow: ping-slow 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+:root {
+  --radius: 0.75rem;
+
+  --asphalt: oklch(0.205 0.008 260);
+  --asphalt-deep: oklch(0.155 0.007 260);
+  --paint: oklch(0.97 0.008 95);
+
+  --background: var(--asphalt-deep);
+  --foreground: oklch(0.95 0.01 95);
+  --card: oklch(0.215 0.009 260);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.235 0.01 260);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.87 0.17 92);
+  --primary-foreground: oklch(0.17 0.01 260);
+  --secondary: oklch(0.27 0.01 260);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.25 0.009 260);
+  --muted-foreground: oklch(0.72 0.015 260);
+  --accent: oklch(0.3 0.012 260);
+  --accent-foreground: var(--foreground);
+  --destructive: oklch(0.64 0.22 27);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.87 0.17 92 / 70%);
+
+  --sign: oklch(0.45 0.105 158);
+  --sign-foreground: oklch(0.98 0.01 120);
+
+  --signal-red: oklch(0.64 0.23 27);
+  --signal-amber: oklch(0.82 0.16 75);
+  --signal-green: oklch(0.76 0.18 152);
+  --support: oklch(0.76 0.17 152);
+  --dispute: oklch(0.8 0.15 70);
+  --flag: oklch(0.66 0.21 22);
+
+  --cat-accident: oklch(0.65 0.22 27);
+  --cat-violation: oklch(0.83 0.16 82);
+  --cat-police: oklch(0.66 0.16 255);
+  --cat-road: oklch(0.73 0.18 50);
+  --cat-safety: oklch(0.74 0.16 155);
+  --cat-other: oklch(0.75 0.03 260);
+
+  --chart-1: var(--cat-accident);
+  --chart-2: var(--cat-violation);
+  --chart-3: var(--cat-police);
+  --chart-4: var(--cat-road);
+  --chart-5: var(--cat-safety);
+
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  --shadow-glow:
+    0 0 0 1px color-mix(in oklab, var(--primary) 40%, transparent),
+    0 18px 50px -18px color-mix(in oklab, var(--primary) 55%, transparent);
+  --shadow-card: 0 1px 0 0 oklch(1 0 0 / 5%) inset, 0 24px 48px -28px oklch(0 0 0 / 80%);
+  --gradient-headlight: radial-gradient(
+    60% 50% at 50% 0%,
+    color-mix(in oklab, var(--primary) 22%, transparent),
+    transparent 70%
+  );
+}
+
+.dark {
+  /* Single dark "night road" theme; .dark mirrors :root. */
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      var(--gradient-headlight),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+}
+
+/* ---------- Road utilities ---------- */
+
+/* Dashed centre line */
+@utility lane-dash {
+  background-image: repeating-linear-gradient(90deg, var(--primary) 0 28px, transparent 28px 52px);
+  height: 4px;
+  border-radius: 2px;
+}
+
+@utility lane-dash-v {
+  background-image: repeating-linear-gradient(180deg, var(--primary) 0 28px, transparent 28px 52px);
+  width: 4px;
+}
+
+/* Zebra crossing stripes */
+@utility zebra {
+  background-image: repeating-linear-gradient(-45deg, var(--paint) 0 10px, transparent 10px 20px);
+}
+
+@utility hazard {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--primary) 0 12px,
+    var(--primary-foreground) 12px 24px
+  );
+}
+
+/* Asphalt panel with grain */
+@utility asphalt-panel {
+  background-color: var(--card);
+  background-image:
+    linear-gradient(180deg, oklch(1 0 0 / 3%), transparent 40%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  box-shadow: var(--shadow-card);
+}
+
+/* Green highway sign plate */
+@utility sign-plate {
+  background: var(--sign);
+  color: var(--sign-foreground);
+  border-radius: 0.6rem;
+  box-shadow:
+    inset 0 0 0 3px var(--sign),
+    inset 0 0 0 5px var(--sign-foreground),
+    0 14px 30px -14px oklch(0 0 0 / 80%);
+}
+
+/* LED dot-matrix text */
+@utility led-text {
+  font-family: var(--font-mono);
+  color: var(--signal-amber);
+  text-shadow:
+    0 0 6px color-mix(in oklab, var(--signal-amber) 70%, transparent),
+    0 0 18px color-mix(in oklab, var(--signal-amber) 35%, transparent);
+}
+
+@utility led-board {
+  background-color: oklch(0.11 0.005 260);
+  background-image: radial-gradient(oklch(1 0 0 / 6%) 1px, transparent 1.2px);
+  background-size: 5px 5px;
+}
+
+/* Perforated ticket edge */
+@utility perforated {
+  background-image: radial-gradient(circle at 10px 50%, var(--background) 7px, transparent 7.5px);
+  background-size: 20px 20px;
+  background-repeat: repeat-x;
+}
+
+@utility text-glow {
+  text-shadow: 0 0 24px color-mix(in oklab, var(--primary) 45%, transparent);
+}
+
+@utility shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+/* ---------- The perspective road (hero) ---------- */
+@utility road-scene {
+  perspective: 420px;
+  perspective-origin: 50% 18%;
+  overflow: hidden;
+}
+
+@utility road-plane {
+  position: absolute;
+  left: 50%;
+  bottom: -2%;
+  width: 92%;
+  height: 210%;
+  transform: translateX(-50%) rotateX(74deg);
+  transform-origin: 50% 100%;
+  background:
+    linear-gradient(90deg, var(--paint) 0 1.2%, transparent 1.2% 98.8%, var(--paint) 98.8%),
+    radial-gradient(
+      60% 30% at 50% 100%,
+      color-mix(in oklab, var(--primary) 14%, transparent),
+      transparent
+    ),
+    linear-gradient(180deg, oklch(0.19 0.008 260), oklch(0.3 0.01 260) 85%);
+}
+
+@utility road-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2.2%;
+  transform: translateX(-50%);
+  background-image: repeating-linear-gradient(
+    180deg,
+    var(--primary) 0 60px,
+    transparent 60px 120px
+  );
+  background-size: 100% 120px;
+}
+
+@keyframes lane {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 120px;
+  }
+}
+@keyframes lane-x {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 52px 0;
+  }
+}
+@keyframes signal {
+  0%,
+  30% {
+    opacity: 1;
+    box-shadow: 0 0 18px 4px currentColor;
+  }
+  34%,
+  100% {
+    opacity: 0.16;
+    box-shadow: none;
+  }
+}
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ping-slow {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ---------- Leaflet skin ---------- */
+.leaflet-container {
+  background: var(--asphalt-deep);
+  font-family: var(--font-sans);
+}
+.leaflet-control-zoom a {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+.leaflet-control-attribution {
+  background: color-mix(in oklab, var(--background) 80%, transparent) !important;
+  color: var(--muted-foreground) !important;
+  font-size: 10px;
+}
+.leaflet-control-attribution a {
+  color: var(--muted-foreground) !important;
+}
+/* Night-mode street map: invert the light OSM style into asphalt tones */
+.mamla-tiles {
+  filter: invert(1) hue-rotate(185deg) brightness(0.82) contrast(0.92) saturate(0.35);
+}
+.mamla-pin {
+  background: transparent;
+  border: 0;
+}
+.mamla-cluster {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+}
+.mamla-cluster__count {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 3px solid var(--primary-foreground);
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow:
+    0 0 0 6px color-mix(in oklab, var(--primary) 24%, transparent),
+    0 8px 18px oklch(0 0 0 / 0.55);
+  color: var(--primary-foreground);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* Form field on asphalt */
+@utility input-road {
+  width: 100%;
+  border-radius: 0.85rem;
+  border: 1px solid var(--input);
+  background: var(--background);
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+  &::placeholder {
+    color: var(--muted-foreground);
+  }
+  &:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 20%, transparent);
+  }
+}
+
+/* Section eyebrow: a short lane dash + label. No letter-spacing (breaks Bangla conjuncts). */
+@utility eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+  &::before {
+    content: "";
+    width: 1.6rem;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--primary);
+  }
+}

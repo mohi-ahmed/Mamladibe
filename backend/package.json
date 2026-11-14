@@ -10,7 +10,9 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
-    "test:watch": "vitest tests/unit"
+    "test:watch": "vitest tests/unit",
+    "presmoke:production": "npm run build",
+    "smoke:production": "node dist/scripts/smoke-production.js"
   },
   "keywords": [],
   "author": "",

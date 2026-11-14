@@ -116,6 +116,53 @@ async function computeCommentCountsByIncidentId(
   return map;
 }
 
+type IncidentCounts = {
+  support: number;
+  dispute: number;
+  flags: number;
+  comments: number;
+};
+
+async function computeIncidentCountsByIncidentId(
+  incidentIds: Types.ObjectId[],
+): Promise<Map<string, IncidentCounts>> {
+  const counts = new Map<string, IncidentCounts>();
+  if (incidentIds.length === 0) return counts;
+
+  const [voteRows, reportRows, commentCounts] = await Promise.all([
+    VoteModel.aggregate<{
+      _id: { incidentId: Types.ObjectId; type: 'support' | 'dispute' };
+      count: number;
+    }>([
+      { $match: { incidentId: { $in: incidentIds } } },
+      { $group: { _id: { incidentId: '$incidentId', type: '$type' }, count: { $sum: 1 } } },
+    ]),
+    ReportModel.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { targetType: 'incident', targetId: { $in: incidentIds } } },
+      { $group: { _id: '$targetId', count: { $sum: 1 } } },
+    ]),
+    computeCommentCountsByIncidentId(incidentIds),
+  ]);
+
+  for (const incidentId of incidentIds) {
+    counts.set(incidentId.toString(), {
+      support: 0,
+      dispute: 0,
+      flags: 0,
+      comments: commentCounts.get(incidentId.toString()) ?? 0,
+    });
+  }
+  for (const row of voteRows) {
+    const entry = counts.get(row._id.incidentId.toString());
+    if (entry) entry[row._id.type] = row.count;
+  }
+  for (const row of reportRows) {
+    const entry = counts.get(row._id.toString());
+    if (entry) entry.flags = row.count;
+  }
+  return counts;
+}
+
 export async function getIncidentCounts(incidentId: Types.ObjectId): Promise<{
   support: number;
   dispute: number;
@@ -149,7 +196,7 @@ export async function getIncidentCounts(incidentId: Types.ObjectId): Promise<{
 
 function formatPublicIncidentDetail(
   doc: IncidentLean,
-  counts: { support: number; dispute: number; flags: number; comments: number },
+  counts: IncidentCounts,
   my: { vote: 'support' | 'dispute' | null; flagged: boolean },
 ) {
   return {
@@ -171,6 +218,20 @@ function formatPublicIncidentDetail(
     source: doc.source,
     counts,
     my,
+  };
+}
+
+function formatPublicIncidentListItem(
+  doc: IncidentLean,
+  counts: IncidentCounts,
+  distanceKm?: number,
+) {
+  return {
+    ...formatPublicIncidentDetail(doc, counts, { vote: null, flagged: false }),
+    excerpt: createExcerpt(doc.description, LIMITS.EXCERPT_MAX_CHARS),
+    ...(distanceKm === undefined
+      ? {}
+      : { distanceKm: Math.round(distanceKm * 100) / 100 }),
   };
 }
 
@@ -438,7 +499,7 @@ export async function createPublicIncident(
 }
 
 const PUBLIC_LIST_SELECT =
-  'trackingId title description category incidentAt createdAt location areaName district';
+  'trackingId title description category incidentAt createdAt location roadName areaName upazila district safetyTip isEdited editedAt moderatedEdit source';
 const REDACTED_TEXT_PLACEHOLDER = '[Removed by moderators]';
 const HIDDEN_TEXT_PLACEHOLDER = '[Hidden by moderators]';
 
@@ -562,24 +623,23 @@ export async function listPublicIncidents(query: ListIncidentsQuery) {
       )
       .slice(0, effectiveLimit);
 
-    const commentCounts = await computeCommentCountsByIncidentId(
+    const incidentCounts = await computeIncidentCountsByIncidentId(
       withDistance.map((entry) => entry.doc._id),
     );
 
     return {
-      items: withDistance.map(({ doc, distanceKm }) => ({
-        trackingId: doc.trackingId,
-        title: doc.title,
-        excerpt: createExcerpt(doc.description, LIMITS.EXCERPT_MAX_CHARS),
-        category: doc.category,
-        incidentAt: doc.incidentAt.toISOString(),
-        createdAt: doc.createdAt.toISOString(),
-        location: toCoordinatesObject(doc.location),
-        areaName: doc.areaName ?? null,
-        district: doc.district ?? null,
-        commentCount: commentCounts.get(doc._id.toString()) ?? 0,
-        distanceKm: Math.round(distanceKm * 100) / 100,
-      })),
+      items: withDistance.map(({ doc, distanceKm }) =>
+        formatPublicIncidentListItem(
+          doc,
+          incidentCounts.get(doc._id.toString()) ?? {
+            support: 0,
+            dispute: 0,
+            flags: 0,
+            comments: 0,
+          },
+          distanceKm,
+        ),
+      ),
       nextCursor: null,
       truncated: false,
     };
@@ -614,23 +674,22 @@ export async function listPublicIncidents(query: ListIncidentsQuery) {
   const pageDocs = hasMore ? docs.slice(0, effectiveLimit) : docs;
   const lastDoc = pageDocs[pageDocs.length - 1];
 
-  const commentCounts = await computeCommentCountsByIncidentId(
+  const incidentCounts = await computeIncidentCountsByIncidentId(
     pageDocs.map((doc) => doc._id),
   );
 
   return {
-    items: pageDocs.map((doc) => ({
-      trackingId: doc.trackingId,
-      title: doc.title,
-      excerpt: createExcerpt(doc.description, LIMITS.EXCERPT_MAX_CHARS),
-      category: doc.category,
-      incidentAt: doc.incidentAt.toISOString(),
-      createdAt: doc.createdAt.toISOString(),
-      location: toCoordinatesObject(doc.location),
-      areaName: doc.areaName ?? null,
-      district: doc.district ?? null,
-      commentCount: commentCounts.get(doc._id.toString()) ?? 0,
-    })),
+    items: pageDocs.map((doc) =>
+      formatPublicIncidentListItem(
+        doc,
+        incidentCounts.get(doc._id.toString()) ?? {
+          support: 0,
+          dispute: 0,
+          flags: 0,
+          comments: 0,
+        },
+      ),
+    ),
     nextCursor:
       hasMore && lastDoc ? encodeCursor(lastDoc.createdAt, lastDoc._id) : null,
     truncated: Boolean(query.bbox && hasMore),
