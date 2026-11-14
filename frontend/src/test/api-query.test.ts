@@ -87,6 +87,25 @@ describe("API v1 contract", () => {
     });
   });
 
+  it("normalizes legacy and unknown backend categories without crashing the UI", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          items: [
+            { ...apiIncident, trackingId: "MD-LEGACY1", category: "safety" },
+            { ...apiIncident, trackingId: "MD-UNKNOWN", category: "unexpected_value" },
+          ],
+          nextCursor: null,
+          truncated: false,
+        }),
+      ),
+    );
+
+    const result = await api.listIncidents();
+    expect(result.items.map((incident) => incident.category)).toEqual(["public_safety", "other"]);
+  });
+
   it("creates incidents with a nested location object", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(
